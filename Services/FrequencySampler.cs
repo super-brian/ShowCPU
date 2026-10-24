@@ -1,0 +1,180 @@
+using System.Management;
+using System.Runtime.InteropServices;
+
+namespace ShowCPU.Services;
+
+/// <summary>
+/// Current clock as a percent of the processor base frequency.
+/// Values can be under 100% (power save / thermal) or over 100% (turbo).
+/// Graph top is 2x base. 0.8 GHz is drawn at mid-height.
+/// </summary>
+internal sealed class FrequencySampler : IDisposable
+{
+    private const uint PdhFmtDouble = 0x00000200;
+    private const string FrequencyCounter = @"\Processor Information(_Total)\Processor Frequency";
+    private const string MaxFrequencyCounter = @"\Processor Information(_Total)\% of Maximum Frequency";
+
+    // Graph top is 2x base (MaxClockSpeed). Mid-height is 0.8 GHz, not base.
+    private const double MaxTurboMultiple = 2.0;
+
+    private readonly double _baseMhz;
+    private readonly bool _hasCounter;
+    private IntPtr _query;
+    private IntPtr _counter;
+    private IntPtr _maxCounter;
+    private double _maxMhz;
+
+    public FrequencySampler()
+    {
+        _baseMhz = ReadBaseMhz();
+        _hasCounter = _baseMhz > 0 && TryOpenCounter();
+    }
+
+    public double BaseMhz => _baseMhz;
+
+    /// <summary>
+    /// Top of the CLK graph as percent of base. Fixed at 200.
+    /// Mid-height is 0.8 GHz; this value is only the top of the line.
+    /// </summary>
+    public double? MaxPercentOfBase
+    {
+        get
+        {
+            if (_baseMhz <= 0)
+                return null;
+
+            return MaxTurboMultiple * 100.0;
+        }
+    }
+
+    public void Prime()
+    {
+        _ = TryRead(out _, out _);
+    }
+
+    public bool TryRead(out double percentOfBase, out double currentMhz)
+    {
+        percentOfBase = 0;
+        currentMhz = 0;
+        if (!_hasCounter || _baseMhz <= 0)
+            return false;
+
+        if (PdhCollectQueryData(_query) != 0)
+            return false;
+
+        uint status = PdhGetFormattedCounterValue(_counter, PdhFmtDouble, out _, out PdhFormatted value);
+        if (status != 0 || value.CStatus != 0 || value.DoubleValue <= 0)
+            return false;
+
+        currentMhz = value.DoubleValue;
+        percentOfBase = currentMhz * 100.0 / _baseMhz;
+        if (percentOfBase < 0)
+            percentOfBase = 0;
+
+        UpdateMaxMhz(currentMhz);
+        return true;
+    }
+
+    public void Dispose()
+    {
+        if (_query == IntPtr.Zero)
+            return;
+
+        _ = PdhCloseQuery(_query);
+        _query = IntPtr.Zero;
+        _counter = IntPtr.Zero;
+        _maxCounter = IntPtr.Zero;
+    }
+
+    private void UpdateMaxMhz(double currentMhz)
+    {
+        double capMhz = _baseMhz * MaxTurboMultiple;
+        if (currentMhz > _maxMhz && currentMhz <= capMhz)
+            _maxMhz = currentMhz;
+
+        if (_maxCounter == IntPtr.Zero || _baseMhz <= 0)
+            return;
+
+        uint status = PdhGetFormattedCounterValue(_maxCounter, PdhFmtDouble, out _, out PdhFormatted ofMax);
+        // Low "% of Maximum Frequency" makes estimated max explode; ignore it.
+        if (status != 0 || ofMax.CStatus != 0 || !double.IsFinite(ofMax.DoubleValue) || ofMax.DoubleValue < 20 || ofMax.DoubleValue > 100)
+            return;
+
+        double estimatedMax = currentMhz * 100.0 / ofMax.DoubleValue;
+        if (!double.IsFinite(estimatedMax) || estimatedMax < _baseMhz || estimatedMax > capMhz)
+            return;
+
+        if (estimatedMax > _maxMhz)
+            _maxMhz = estimatedMax;
+    }
+
+    private static double ReadBaseMhz()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT MaxClockSpeed FROM Win32_Processor");
+            double total = 0;
+            int count = 0;
+            foreach (ManagementBaseObject obj in searcher.Get())
+            {
+                using (obj)
+                {
+                    if (obj["MaxClockSpeed"] is not null and not DBNull)
+                    {
+                        total += Convert.ToDouble(obj["MaxClockSpeed"]);
+                        count++;
+                    }
+                }
+            }
+
+            return count > 0 ? total / count : 0;
+        }
+        catch (Exception ex) when (ex is ManagementException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
+        {
+            return 0;
+        }
+    }
+
+    private bool TryOpenCounter()
+    {
+        if (PdhOpenQuery(null, IntPtr.Zero, out _query) != 0)
+            return false;
+
+        if (PdhAddEnglishCounter(_query, FrequencyCounter, IntPtr.Zero, out _counter) != 0)
+        {
+            Dispose();
+            return false;
+        }
+
+        // Optional: used to discover turbo max for the graph scale.
+        if (PdhAddEnglishCounter(_query, MaxFrequencyCounter, IntPtr.Zero, out _maxCounter) != 0)
+            _maxCounter = IntPtr.Zero;
+
+        return true;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct PdhFormatted
+    {
+        [FieldOffset(0)]
+        public uint CStatus;
+
+        [FieldOffset(8)]
+        public double DoubleValue;
+    }
+
+    [DllImport("pdh.dll", CharSet = CharSet.Unicode)]
+    private static extern uint PdhOpenQuery(string? dataSource, IntPtr userData, out IntPtr query);
+
+    [DllImport("pdh.dll", CharSet = CharSet.Unicode)]
+    private static extern uint PdhAddEnglishCounter(IntPtr query, string path, IntPtr userData, out IntPtr counter);
+
+    [DllImport("pdh.dll")]
+    private static extern uint PdhCollectQueryData(IntPtr query);
+
+    [DllImport("pdh.dll")]
+    private static extern uint PdhGetFormattedCounterValue(IntPtr counter, uint format, out uint type, out PdhFormatted value);
+
+    [DllImport("pdh.dll")]
+    private static extern uint PdhCloseQuery(IntPtr query);
+}

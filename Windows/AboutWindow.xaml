@@ -1,0 +1,89 @@
+<Window x:Class="ShowCPU.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="About"
+        Width="400"
+        SizeToContent="Height"
+        MinWidth="400"
+        MaxWidth="400"
+        WindowStartupLocation="Manual"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="#1A1A1A"
+        Foreground="#F4F4F5"
+        FontFamily="Segoe UI"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0"
+                      ResizeBorderThickness="0"
+                      GlassFrameThickness="0"
+                      CornerRadius="12"
+                      UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+    <Border BorderBrush="#333333" BorderThickness="1" Background="#1A1A1A">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="48"/>
+                <RowDefinition Height="1"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Background="Transparent" MouseLeftButtonDown="Title_MouseLeftButtonDown">
+                    <TextBlock Text="About"
+                               Margin="20,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="14"
+                               FontWeight="SemiBold"/>
+                </Border>
+                <Button Grid.Column="1"
+                        Style="{StaticResource CloseButton}"
+                        Click="Close_Click"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Close"/>
+            </Grid>
+
+            <Border Grid.Row="1" Background="#2A2A2A"/>
+
+            <StackPanel Grid.Row="2" Margin="20,18,20,22">
+                <StackPanel Orientation="Horizontal">
+                    <Grid Width="36" Height="36" Margin="0,0,12,0">
+                        <Border Background="#242424" BorderBrush="#333333" BorderThickness="1" CornerRadius="10"/>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Bottom"
+                                    Margin="0,0,0,7">
+                            <Border Width="3" Height="8" Background="#3DDC84" CornerRadius="1.5" Margin="1,0" VerticalAlignment="Bottom"/>
+                            <Border Width="3" Height="13" Background="#5BE59A" CornerRadius="1.5" Margin="1,0" VerticalAlignment="Bottom"/>
+                            <Border Width="3" Height="10" Background="#3DDC84" CornerRadius="1.5" Margin="1,0" VerticalAlignment="Bottom"/>
+                            <Border Width="3" Height="16" Background="#8CFFC0" CornerRadius="1.5" Margin="1,0" VerticalAlignment="Bottom"/>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="ShowCPU" FontSize="20" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="VersionRun"
+                                   Text="Version 1.0.0"
+                                   Margin="0,2,0,0"
+                                   FontSize="12"
+                                   Foreground="#A1A1AA"/>
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock Text="Taskbar widget that shows CPU usage, clock speed, and package power for the last 15 seconds."
+                           Margin="0,16,0,0"
+                           FontSize="13"
+                           Foreground="#D4D4D8"
+                           TextWrapping="Wrap"
+                           LineHeight="18"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
