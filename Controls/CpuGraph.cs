@@ -7,15 +7,12 @@ public sealed class CpuGraph : FrameworkElement
 {
     private const int SampleCount = 15;
 
-    private const double ClockCenterMhz = 800.0;
-
     private readonly double?[] _samples = new double?[SampleCount];
     private readonly double?[] _clocks = new double?[SampleCount];
     private readonly double?[] _powers = new double?[SampleCount];
-    // Top stays at 2x base. 0.8 GHz is the vertical center once base MHz is known.
-    private double _clockScaleMax = 200.0;
-    private double _clockCenterPercent = 100.0;
-    private double _baseMhz;
+    // Tops are the highest clock and power seen so far. 0 is the bottom.
+    private double _clockScaleMax = 1.0;
+    private bool _clockScaleSet;
     private double? _powerScaleMax;
 
     private static readonly (int Min, SolidColorBrush Brush)[] Bands =
@@ -54,32 +51,15 @@ public sealed class CpuGraph : FrameworkElement
 
     public void SetClockScaleMax(double? percentOfBase)
     {
-        if (percentOfBase is not double percent || !double.IsFinite(percent) || percent < 200)
+        if (percentOfBase is not double percent || !double.IsFinite(percent) || percent <= 0)
             return;
 
-        // Top is 2x base. Mid-height is 0.8 GHz, not this cap.
-        double next = Math.Clamp(percent, 200.0, 200.0);
-        if (Math.Abs(next - _clockScaleMax) < 0.25)
+        // The first value replaces the placeholder. Later values only move the top up.
+        if (_clockScaleSet && percent <= _clockScaleMax + 0.25)
             return;
 
-        _clockScaleMax = next;
-        InvalidateVisual();
-    }
-
-    public void SetClockBaseMhz(double? baseMhz)
-    {
-        if (baseMhz is not double mhz || !double.IsFinite(mhz) || mhz <= ClockCenterMhz)
-            return;
-
-        if (Math.Abs(mhz - _baseMhz) < 0.5)
-            return;
-
-        _baseMhz = mhz;
-        double center = ClockCenterMhz * 100.0 / mhz;
-        if (center <= 0 || center >= _clockScaleMax)
-            center = _clockScaleMax * 0.5;
-
-        _clockCenterPercent = center;
+        _clockScaleMax = percent;
+        _clockScaleSet = true;
         InvalidateVisual();
     }
 
@@ -88,8 +68,8 @@ public sealed class CpuGraph : FrameworkElement
         if (watts is not double value || !double.IsFinite(value) || value <= 0)
             return;
 
-        double next = Math.Clamp(value, 10.0, 500.0);
-        if (_powerScaleMax is double current && next <= current + 0.25)
+        double next = Math.Min(value, 500.0);
+        if (_powerScaleMax is double current && next <= current + 0.05)
             return;
 
         _powerScaleMax = next;
@@ -122,7 +102,7 @@ public sealed class CpuGraph : FrameworkElement
                 power = 0;
             powerWatts = power;
             if (_powerScaleMax is not double powerScale || power > powerScale)
-                SetPowerScaleMax(Math.Max(power * 1.25, 10.0));
+                SetPowerScaleMax(power);
         }
 
         for (int i = 0; i < _samples.Length - 1; i++)
@@ -246,17 +226,9 @@ public sealed class CpuGraph : FrameworkElement
 
     private double ClockY(double percentOfBase, double height)
     {
-        double clamped = Math.Clamp(percentOfBase, 0, _clockScaleMax);
-        double center = _clockCenterPercent;
-        if (center <= 0 || center >= _clockScaleMax)
-            return height * (1.0 - (clamped / _clockScaleMax));
-
-        // 0 at the bottom, 0.8 GHz at mid-height, scale max at the top.
-        if (clamped <= center)
-            return height * (1.0 - (0.5 * clamped / center));
-
-        double t = (clamped - center) / (_clockScaleMax - center);
-        return height * (0.5 * (1.0 - t));
+        double scale = _clockScaleMax > 0 ? _clockScaleMax : 1.0;
+        double clamped = Math.Clamp(percentOfBase, 0, scale);
+        return height * (1.0 - (clamped / scale));
     }
 
     private double PowerY(double watts, double height)

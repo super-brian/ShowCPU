@@ -40,9 +40,15 @@ internal sealed class PowerSampler : IDisposable
     }
 
     /// <summary>
-    /// Top of the PWR graph in watts. Grows with observed peaks.
+    /// Top of the PWR graph in watts: the highest package power seen so far.
     /// </summary>
     public double? MaxWatts => _maxWatts > 0 ? _maxWatts : null;
+
+    public void SeedPeakWatts(double? watts)
+    {
+        if (watts is double value)
+            NotePeak(value);
+    }
 
     public void Prime()
     {
@@ -85,7 +91,7 @@ internal sealed class PowerSampler : IDisposable
         if (!double.IsFinite(watts) || watts < 0 || watts > MaxReasonableWatts)
             return false;
 
-        UpdateMaxWatts(watts);
+        NotePeak(watts);
         return true;
     }
 
@@ -98,12 +104,12 @@ internal sealed class PowerSampler : IDisposable
         _handle = IntPtr.Zero;
     }
 
-    private void UpdateMaxWatts(double watts)
+    private void NotePeak(double watts)
     {
-        // Leave headroom so typical load sits mid-graph; never shrink.
-        double floor = Math.Max(10.0, watts * 1.25);
-        if (floor > _maxWatts)
-            _maxWatts = Math.Min(floor, MaxReasonableWatts);
+        if (!double.IsFinite(watts) || watts <= _maxWatts || watts > MaxReasonableWatts)
+            return;
+
+        _maxWatts = watts;
     }
 
     private bool TryOpen()

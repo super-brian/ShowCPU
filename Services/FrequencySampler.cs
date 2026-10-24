@@ -6,22 +6,18 @@ namespace ShowCPU.Services;
 /// <summary>
 /// Current clock as a percent of the processor base frequency.
 /// Values can be under 100% (power save / thermal) or over 100% (turbo).
-/// Graph top is 2x base. 0.8 GHz is drawn at mid-height.
+/// Graph top is the highest clock seen so far.
 /// </summary>
 internal sealed class FrequencySampler : IDisposable
 {
     private const uint PdhFmtDouble = 0x00000200;
     private const string FrequencyCounter = @"\Processor Information(_Total)\Processor Frequency";
-    private const string MaxFrequencyCounter = @"\Processor Information(_Total)\% of Maximum Frequency";
-
-    // Graph top is 2x base (MaxClockSpeed). Mid-height is 0.8 GHz, not base.
-    private const double MaxTurboMultiple = 2.0;
+    private const double MaxPeakMhz = 10000.0;
 
     private readonly double _baseMhz;
     private readonly bool _hasCounter;
     private IntPtr _query;
     private IntPtr _counter;
-    private IntPtr _maxCounter;
     private double _maxMhz;
 
     public FrequencySampler()
@@ -33,18 +29,28 @@ internal sealed class FrequencySampler : IDisposable
     public double BaseMhz => _baseMhz;
 
     /// <summary>
-    /// Top of the CLK graph as percent of base. Fixed at 200.
-    /// Mid-height is 0.8 GHz; this value is only the top of the line.
+    /// Highest clock seen, in MHz. Null until a reading or a saved peak is seeded.
+    /// </summary>
+    public double? PeakMhz => _maxMhz > 0 ? _maxMhz : null;
+
+    /// <summary>
+    /// Top of the CLK graph as percent of base: the highest clock seen so far.
     /// </summary>
     public double? MaxPercentOfBase
     {
         get
         {
-            if (_baseMhz <= 0)
+            if (_baseMhz <= 0 || _maxMhz <= 0)
                 return null;
 
-            return MaxTurboMultiple * 100.0;
+            return _maxMhz * 100.0 / _baseMhz;
         }
+    }
+
+    public void SeedPeakMhz(double? mhz)
+    {
+        if (mhz is double value)
+            NotePeak(value);
     }
 
     public void Prime()
@@ -71,7 +77,7 @@ internal sealed class FrequencySampler : IDisposable
         if (percentOfBase < 0)
             percentOfBase = 0;
 
-        UpdateMaxMhz(currentMhz);
+        NotePeak(currentMhz);
         return true;
     }
 
@@ -83,29 +89,14 @@ internal sealed class FrequencySampler : IDisposable
         _ = PdhCloseQuery(_query);
         _query = IntPtr.Zero;
         _counter = IntPtr.Zero;
-        _maxCounter = IntPtr.Zero;
     }
 
-    private void UpdateMaxMhz(double currentMhz)
+    private void NotePeak(double mhz)
     {
-        double capMhz = _baseMhz * MaxTurboMultiple;
-        if (currentMhz > _maxMhz && currentMhz <= capMhz)
-            _maxMhz = currentMhz;
-
-        if (_maxCounter == IntPtr.Zero || _baseMhz <= 0)
+        if (!double.IsFinite(mhz) || mhz <= _maxMhz || mhz > MaxPeakMhz)
             return;
 
-        uint status = PdhGetFormattedCounterValue(_maxCounter, PdhFmtDouble, out _, out PdhFormatted ofMax);
-        // Low "% of Maximum Frequency" makes estimated max explode; ignore it.
-        if (status != 0 || ofMax.CStatus != 0 || !double.IsFinite(ofMax.DoubleValue) || ofMax.DoubleValue < 20 || ofMax.DoubleValue > 100)
-            return;
-
-        double estimatedMax = currentMhz * 100.0 / ofMax.DoubleValue;
-        if (!double.IsFinite(estimatedMax) || estimatedMax < _baseMhz || estimatedMax > capMhz)
-            return;
-
-        if (estimatedMax > _maxMhz)
-            _maxMhz = estimatedMax;
+        _maxMhz = mhz;
     }
 
     private static double ReadBaseMhz()
@@ -145,10 +136,6 @@ internal sealed class FrequencySampler : IDisposable
             Dispose();
             return false;
         }
-
-        // Optional: used to discover turbo max for the graph scale.
-        if (PdhAddEnglishCounter(_query, MaxFrequencyCounter, IntPtr.Zero, out _maxCounter) != 0)
-            _maxCounter = IntPtr.Zero;
 
         return true;
     }

@@ -60,8 +60,10 @@ public partial class App : System.Windows.Application
         _sampler = new CpuSampler();
         _sampler.Prime();
         _frequency = new FrequencySampler();
+        _frequency.SeedPeakMhz(_appSettings.PeakClockMhz);
         _frequency.Prime();
         _power = new PowerSampler();
+        _power.SeedPeakWatts(_appSettings.PeakPowerWatts);
         _power.Prime();
         _processCpu = new ProcessCpuTracker();
         _highCpuLog = new HighCpuLogger(_appSettings, _store);
@@ -160,11 +162,11 @@ public partial class App : System.Windows.Application
                     clockPercent,
                     clockMhz,
                     _frequency?.MaxPercentOfBase,
-                    _frequency?.BaseMhz,
                     powerWatts,
                     powerShown,
                     _power?.MaxWatts);
                 _tray.SetCpu(_lastCpuShown, _lastClockGhz, _lastPowerShown);
+                RememberPeaks();
 
                 MaybeLogHighCpu(cpuPercent, clockMhz);
             }
@@ -186,6 +188,39 @@ public partial class App : System.Windows.Application
         return ghz >= 10.0
             ? Math.Round(ghz, MidpointRounding.AwayFromZero).ToString(System.Globalization.CultureInfo.InvariantCulture) + "G"
             : ghz.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "G";
+    }
+
+    private void RememberPeaks()
+    {
+        if (_store == null)
+            return;
+
+        bool changed = false;
+        if (_frequency?.PeakMhz is double clockPeak
+            && (_appSettings.PeakClockMhz is not double savedClock || clockPeak > savedClock + 0.01))
+        {
+            _appSettings.PeakClockMhz = clockPeak;
+            changed = true;
+        }
+
+        if (_power?.MaxWatts is double powerPeak
+            && (_appSettings.PeakPowerWatts is not double savedPower || powerPeak > savedPower + 0.01))
+        {
+            _appSettings.PeakPowerWatts = powerPeak;
+            changed = true;
+        }
+
+        if (!changed)
+            return;
+
+        try
+        {
+            _store.Save(_appSettings);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            // Keep the in-memory peak even if the file cannot be written.
+        }
     }
 
     private void MaybeLogHighCpu(double? cpuPercent, double? clockMhz)

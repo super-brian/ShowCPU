@@ -11,7 +11,7 @@ It sits on the primary taskbar, next to the notification area, and keeps a tray 
 - **CPU** is the current processor busy percent, shown as a whole number.
 - **CLK** is the current clock in GHz. The label turns red when the clock is at or above the processor base frequency.
 - **PWR** is CPU package power in watts. It appears when Windows exposes an energy meter, which is typical on Windows 11.
-- The graph holds 15 one-second samples. **CPU** is a bar that changes color as usage rises, from violet at the low end to red near 100%. **Clock** is a line, blue under the base frequency and red at or above it, with 0.8 GHz at mid-height and twice the base frequency at the top. **Power** is an orange line scaled to the highest reading seen.
+- The graph holds 15 one-second samples. **CPU** is a bar that changes color as usage rises, from violet at the low end to red near 100%. **Clock** is a line, blue under the base frequency and red at or above it. The top of that line is the highest GHz seen so far. **Power** is an orange line whose top is the highest watts seen so far. Both peaks are remembered across launches.
 - Drag the widget along the taskbar to move it. The position is saved and restored, including after a display scale or taskbar size change.
 - The widget follows the primary taskbar on the bottom, top, left, or right. It hides while the taskbar is hidden and shows again when the taskbar comes back.
 - The tray tooltip shows the live readings. Left-click opens **About**. Right-click offers **About**, **Quit**, and **Quit Forever**.

@@ -50,7 +50,6 @@ public partial class WidgetWindow : Window
         double? clockPercent,
         double? clockMhz,
         double? clockScaleMax = null,
-        double? clockBaseMhz = null,
         double? powerWatts = null,
         int? powerShown = null,
         double? powerScaleMax = null)
@@ -63,7 +62,6 @@ public partial class WidgetWindow : Window
         }
 
         Graph.SetClockScaleMax(clockScaleMax);
-        Graph.SetClockBaseMhz(clockBaseMhz);
         Graph.SetPowerScaleMax(powerScaleMax);
         Graph.Push(cpuPercent, clockPercent, powerWatts);
 

@@ -22,6 +22,12 @@ internal sealed class AppSettings
     // File name only (under Downloads) of the active high-CPU log. Updated when
     // a new ShowCPU-*.log is created after the previous one hits 10 MB.
     public string? HighCpuLogFileName { get; set; }
+
+    // Highest processor clock seen, in MHz. The CLK line uses this as its top.
+    public double? PeakClockMhz { get; set; }
+
+    // Highest package power seen, in watts. The PWR line uses this as its top.
+    public double? PeakPowerWatts { get; set; }
 }
 
 internal sealed class SettingsStore
