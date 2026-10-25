@@ -7,11 +7,14 @@ namespace ShowCPU.Services;
 /// Current clock as a percent of the processor base frequency.
 /// Values can be under 100% (power save / thermal) or over 100% (turbo).
 /// Graph top is the highest clock seen so far.
+/// Processor Frequency stays at the last OS-controlled MHz (often the
+/// 800 MHz minimum) when the CPU turbos on its own. Task Manager speed is
+/// base MHz times % Processor Performance.
 /// </summary>
 internal sealed class FrequencySampler : IDisposable
 {
     private const uint PdhFmtDouble = 0x00000200;
-    private const string FrequencyCounter = @"\Processor Information(_Total)\Processor Frequency";
+    private const string PerformanceCounter = @"\Processor Information(_Total)\% Processor Performance";
     private const double MaxPeakMhz = 10000.0;
 
     private readonly double _baseMhz;
@@ -69,13 +72,14 @@ internal sealed class FrequencySampler : IDisposable
             return false;
 
         uint status = PdhGetFormattedCounterValue(_counter, PdhFmtDouble, out _, out PdhFormatted value);
-        if (status != 0 || value.CStatus != 0 || value.DoubleValue <= 0)
+        // 0 is valid data. 1 is valid data that changed since the last sample.
+        if (status != 0 || value.CStatus > 1 || !double.IsFinite(value.DoubleValue) || value.DoubleValue <= 0)
             return false;
 
-        currentMhz = value.DoubleValue;
-        percentOfBase = currentMhz * 100.0 / _baseMhz;
-        if (percentOfBase < 0)
-            percentOfBase = 0;
+        percentOfBase = value.DoubleValue;
+        currentMhz = _baseMhz * percentOfBase / 100.0;
+        if (!double.IsFinite(currentMhz) || currentMhz <= 0 || currentMhz > MaxPeakMhz)
+            return false;
 
         NotePeak(currentMhz);
         return true;
@@ -131,7 +135,7 @@ internal sealed class FrequencySampler : IDisposable
         if (PdhOpenQuery(null, IntPtr.Zero, out _query) != 0)
             return false;
 
-        if (PdhAddEnglishCounter(_query, FrequencyCounter, IntPtr.Zero, out _counter) != 0)
+        if (PdhAddEnglishCounter(_query, PerformanceCounter, IntPtr.Zero, out _counter) != 0)
         {
             Dispose();
             return false;
