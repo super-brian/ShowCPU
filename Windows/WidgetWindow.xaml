@@ -18,8 +18,9 @@
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType">
+    <Grid>
     <Border x:Name="Pill"
-            BorderBrush="#3A3A3A"
+            BorderBrush="Transparent"
             BorderThickness="1"
             CornerRadius="4"
             SnapsToDevicePixels="True">
@@ -38,9 +39,9 @@
             </Grid.ColumnDefinitions>
             <Grid Grid.Column="0" VerticalAlignment="Center" ClipToBounds="True">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="16"/>
-                    <RowDefinition Height="16"/>
-                    <RowDefinition Height="16"/>
+                    <RowDefinition Height="13"/>
+                    <RowDefinition Height="13"/>
+                    <RowDefinition Height="13"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -66,7 +67,9 @@
                            VerticalAlignment="Center"
                            HorizontalAlignment="Left"
                            TextAlignment="Left"
-                           TextWrapping="NoWrap"/>
+                           TextWrapping="NoWrap"
+                           LineHeight="13"
+                           LineStackingStrategy="BlockLineHeight"/>
                 <TextBlock x:Name="ClockLabel"
                            Grid.Row="1" Grid.Column="0"
                            Text="CLK"
@@ -86,7 +89,9 @@
                            VerticalAlignment="Center"
                            HorizontalAlignment="Left"
                            TextAlignment="Left"
-                           TextWrapping="NoWrap"/>
+                           TextWrapping="NoWrap"
+                           LineHeight="13"
+                           LineStackingStrategy="BlockLineHeight"/>
                 <TextBlock x:Name="PowerLabel"
                            Grid.Row="2" Grid.Column="0"
                            Text="PWR"
@@ -106,9 +111,13 @@
                            VerticalAlignment="Center"
                            HorizontalAlignment="Left"
                            TextAlignment="Left"
-                           TextWrapping="NoWrap"/>
+                           TextWrapping="NoWrap"
+                           LineHeight="13"
+                           LineStackingStrategy="BlockLineHeight"/>
             </Grid>
             <local:CpuGraph x:Name="Graph" Grid.Column="2" Margin="0,0,2,0"/>
         </Grid>
     </Border>
+    <local:PillOutline/>
+    </Grid>
 </Window>
